@@ -1,0 +1,29 @@
+name: app-funcionarios
+
+services:
+  postgres:
+    image: postgres:16
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_DB: bd-funcionarios
+      POSTGRES_USER: coti
+      POSTGRES_PASSWORD: coti
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    ports:
+      - "5051:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: coti@email.com
+      PGADMIN_DEFAULT_PASSWORD: "Coti@2026"
+    depends_on:
+      - postgres
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+
+volumes:
+  postgres_data:
+  pgadmin_data:
