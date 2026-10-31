@@ -1,10 +1,10 @@
-# app-funcionarios — Cadastro de funcionários em Java
+# app-funcionarios — Cadastro e consulta de funcionários em Java
 
-Aplicação de console para cadastrar funcionários e persistir seus dados em um banco PostgreSQL por meio de JDBC. O projeto trabalha conceitos de orientação a objetos, herança, encapsulamento, organização em camadas e execução de SQL com parâmetros.
+Aplicação de console para cadastrar e consultar funcionários, com persistência em PostgreSQL por meio de JDBC. O projeto trabalha conceitos de orientação a objetos, herança, encapsulamento, Lombok, organização em camadas e execução de SQL com parâmetros.
 
 O usuário informa nome, CPF, matrícula, salário e cargo no terminal. A aplicação gera um identificador UUID e grava o registro na tabela `funcionarios`.
 
-**Estado atual:** o cadastro está implementado. A opção de consultar todos os funcionários aparece no menu, mas ainda não tem implementação: ao selecionar `2`, o programa exibe `OPÇÃO INVÁLIDA!`. A consulta dos registros pode ser feita diretamente no PostgreSQL ou pelo pgAdmin.
+**Estado atual:** cadastro e consulta estão implementados no menu. A opção `1` grava um funcionário e a opção `2` lista os registros, ordenados por data de cadastro decrescente e, em caso de empate, por ID. Atualização e exclusão ainda não estão disponíveis.
 
 ## Sumário
 
@@ -27,9 +27,9 @@ O usuário informa nome, CPF, matrícula, salário e cargo no terminal. A aplica
 | Opção do menu | Função apresentada | Situação atual |
 | --- | --- | --- |
 | `1` | Cadastrar um funcionário | Solicita os cinco dados do funcionário, gera o UUID e tenta inserir o registro no banco. |
-| `2` | Consultar todos os funcionários | Aparece no menu, mas não possui um `case 2` no `switch`; exibe opção inválida. |
+| `2` | Consultar todos os funcionários | Basta escolher a opção; não é necessário informar outros dados. Lista ID, nome, CPF, matrícula, salário e cargo. |
 
-A aplicação executa uma única escolha e encerra. Para cadastrar outro funcionário, é necessário iniciar o programa novamente.
+A aplicação executa uma única escolha e encerra. Para cadastrar outro funcionário ou consultar os dados após um cadastro, é necessário iniciar o programa novamente.
 
 O cadastro segue esta sequência:
 
@@ -38,6 +38,13 @@ O cadastro segue esta sequência:
 3. O serviço solicita nome, CPF, matrícula, salário e cargo.
 4. `FuncionarioRepository` abre uma conexão com o PostgreSQL e executa um `INSERT`.
 5. Em caso de sucesso, o repositório imprime `FUNCIONÁRIO CADASTRADO COM SUCESSO!`. Em caso de falha no acesso ou na gravação, imprime a mensagem de erro.
+
+A consulta segue esta sequência:
+
+1. `Main` direciona a opção `2` para `FuncionarioService.consultarFuncionario()`.
+2. O serviço chama `FuncionarioRepository.consultar()`.
+3. O repositório abre uma conexão por `ConnectionFactory`, executa o `SELECT` e transforma cada linha em um objeto `Funcionario`.
+4. O serviço exibe os dados de cada funcionário. Se a lista retornada estiver vazia, imprime `NENHUM FUNCIONÁRIO ENCONTRADO.`.
 
 ## Tecnologias
 
@@ -48,6 +55,7 @@ As versões abaixo são as declaradas nos arquivos do repositório.
 | Java | Source e target `21` | Linguagem e execução da aplicação. |
 | Maven | `cotiinformatica:app-funcionarios:1.0-SNAPSHOT` | Compilação e resolução de dependências. |
 | JDBC | API `java.sql` | Acesso ao banco e execução de comandos SQL. |
+| Lombok | `org.projectlombok:lombok:1.18.48`, escopo `provided` | Geração de métodos nas entidades com `@Data`. |
 | PostgreSQL JDBC Driver | `org.postgresql:postgresql:42.7.13` | Driver para comunicação entre Java e PostgreSQL. |
 | PostgreSQL | Imagem `postgres:16` | Armazenamento dos funcionários. |
 | pgAdmin | Imagem `dpage/pgadmin4:latest` | Administração do PostgreSQL pelo navegador. |
@@ -59,23 +67,25 @@ O ponto de entrada é `cotiinformatica.Main`. A interface de cadastro é o termi
 
 | Arquivo | Responsabilidade |
 | --- | --- |
-| [pom.xml](pom.xml) | Define o projeto Maven, o nível Java e o driver JDBC. |
+| [pom.xml](pom.xml) | Define o projeto Maven, o nível Java, o driver JDBC e o Lombok. |
 | [docker-compose.yml](docker-compose.yml) | Configura PostgreSQL, pgAdmin, portas e volumes. |
-| [Main.java](src/main/java/cotiinformatica/Main.java) | Apresenta o menu, lê a escolha e chama o serviço de cadastro. |
+| [Main.java](src/main/java/cotiinformatica/Main.java) | Apresenta o menu e direciona as opções para cadastro ou consulta. |
 | [entities/Pessoa.java](src/main/java/cotiinformatica/entities/Pessoa.java) | Define os dados comuns de uma pessoa: ID, nome e CPF. |
 | [entities/Funcionario.java](src/main/java/cotiinformatica/entities/Funcionario.java) | Herda de `Pessoa` e acrescenta matrícula, salário e cargo. |
-| [services/FuncionarioService.java](src/main/java/cotiinformatica/services/FuncionarioService.java) | Gera o UUID, lê os dados do terminal e encaminha o funcionário para gravação. |
-| [repositories/FuncionarioRepository.java](src/main/java/cotiinformatica/repositories/FuncionarioRepository.java) | Configura a conexão, executa o `INSERT` e informa o resultado da persistência. |
+| [services/FuncionarioService.java](src/main/java/cotiinformatica/services/FuncionarioService.java) | Gera o UUID, lê os dados do cadastro e apresenta os resultados da consulta. |
+| [factories/ConnectionFactory.java](src/main/java/cotiinformatica/factories/ConnectionFactory.java) | Centraliza as credenciais JDBC e abre conexões pelo método `createConnection()`. |
+| [repositories/FuncionarioRepository.java](src/main/java/cotiinformatica/repositories/FuncionarioRepository.java) | Executa `INSERT` e `SELECT`, monta a lista de funcionários e apresenta erros de acesso ao banco. |
 | [scripts/schema.sql](src/main/java/cotiinformatica/scripts/schema.sql) | Define a tabela `funcionarios`. |
 
 ### Organização em camadas
 
 - **Entidades:** representam os dados do domínio.
-- **Serviço:** coordena o cadastro e, nesta versão, também lê os dados do console.
-- **Repositório:** realiza o acesso ao banco por JDBC.
+- **Serviço:** coordena cadastro e consulta, lê os dados do console e apresenta a lista de funcionários.
+- **Repositório:** realiza a inserção e a consulta no banco por JDBC.
+- **Fábrica de conexões:** reúne a configuração JDBC e a abertura das conexões.
 - **Classe principal:** inicia o programa e encaminha a opção escolhida.
 
-Essa divisão facilita localizar cada responsabilidade. A separação ainda é parcial: o serviço faz interação com o usuário e o repositório imprime mensagens no terminal. As credenciais e a abertura da conexão também estão diretamente no repositório.
+Essa divisão facilita localizar cada responsabilidade. A separação ainda é parcial: o serviço faz interação com o usuário e o repositório imprime mensagens no terminal. As credenciais e a abertura da conexão estão centralizadas em `ConnectionFactory`, utilizada pelo repositório nas duas operações.
 
 ### Como a gravação funciona
 
@@ -88,9 +98,25 @@ VALUES (?, ?, ?, ?, ?, ?);
 
 Os valores são associados aos parâmetros por `setObject`, `setString` e `setDouble`. Dessa forma, os dados informados não são concatenados ao texto do SQL.
 
-A conexão é aberta com `DriverManager.getConnection(...)`. Após `statement.execute()`, o código chama `connection.close()`. Atualmente, o fechamento não está protegido por `finally` ou `try-with-resources`; se ocorrer uma exceção antes dessa chamada, o código não garante o fechamento da conexão.
+O repositório obtém a conexão por `ConnectionFactory.createConnection()`, que utiliza `DriverManager.getConnection(...)`. Tanto a inserção quanto a consulta envolvem a conexão em `try-with-resources`, garantindo seu fechamento ao sair do bloco, inclusive em caso de exceção. Na inserção ainda existe uma chamada explícita a `connection.close()`, redundante com esse gerenciamento.
 
-O método retorna `void` e captura as próprias exceções. O serviço não recebe um objeto de resultado nem um indicador de sucesso.
+O método de inserção retorna `void` e captura as próprias exceções. O serviço não recebe um objeto de resultado nem um indicador de sucesso.
+
+### Como a consulta funciona
+
+O método `FuncionarioRepository.consultar()` executa:
+
+```sql
+SELECT id, nome, cpf, matricula, salario, cargo
+FROM funcionarios
+ORDER BY datahoracadastro DESC, id;
+```
+
+O `ResultSet` é percorrido para montar uma `List<Funcionario>`. O UUID é lido com `getObject("id", UUID.class)`; nome, CPF, matrícula e cargo são lidos como texto, e salário com `getDouble`.
+
+A ordenação prioriza a data de cadastro decrescente e utiliza o ID como segundo critério. A coluna `datahoracadastro` participa da ordenação, mas não é selecionada nem exibida no terminal.
+
+Se ocorrer uma exceção, o repositório imprime `FALHA AO CONSULTAR FUNCIONÁRIOS:` e retorna a lista construída até aquele momento. Isso significa que uma lista vazia também pode ser consequência de falha de consulta; nesse caso, o serviço exibe a mensagem de ausência de funcionários depois da mensagem de erro. Uma falha durante a leitura pode retornar uma lista parcial.
 
 ## Orientação a objetos
 
@@ -107,7 +133,9 @@ Por isso, o serviço pode chamar `funcionario.setNome(...)` e `funcionario.setCp
 
 ### Encapsulamento
 
-Os atributos são privados e acessados por getters e setters públicos. Os setters atuais apenas atribuem os valores: não validam CPF, texto vazio ou salário.
+Os atributos são privados e acessados por getters e setters gerados pelo Lombok. As duas classes utilizam `@Data`, que também gera métodos como `toString`, `equals` e `hashCode`.
+
+Os métodos de acesso de `Pessoa` ficam disponíveis em `Funcionario` por herança. A geração desses métodos não acrescenta validação de CPF, texto vazio ou salário.
 
 A herança existe no modelo Java. No banco, todos os campos são armazenados em uma única tabela `funcionarios`; o esquema não define uma tabela `pessoas` nem um relacionamento entre duas tabelas.
 
@@ -127,11 +155,13 @@ As regras abaixo descrevem o código e as restrições SQL existentes. Melhorias
 | Duplicidade | CPF e matrícula não têm restrição `UNIQUE`; o esquema permite repetir esses valores. |
 | Valores negativos | Não há validação Java nem restrição `CHECK` para impedir salário negativo ou zero. |
 | Data e hora de cadastro | Geradas pelo PostgreSQL com `DEFAULT CURRENT_TIMESTAMP`. Não há campo correspondente nas entidades atuais. |
-| Erros de persistência | São capturados no repositório e exibidos com `FALHA AO GRAVAR NO BANCO DE DADOS:` e `ERRO:`. |
+| Erros de persistência | A inserção captura falhas e imprime `FALHA AO GRAVAR NO BANCO DE DADOS:` e `ERRO:`. A consulta imprime `FALHA AO CONSULTAR FUNCIONÁRIOS:` e `ERRO:`. |
+| Consulta | Retorna todos os funcionários, sem filtros ou paginação, ordenados por `datahoracadastro DESC, id`. |
+| Lista vazia | O serviço imprime `NENHUM FUNCIONÁRIO ENCONTRADO.`. Verifique se houve mensagem de erro antes dela, pois o repositório também retorna uma lista vazia quando falha antes de carregar registros. |
 | Erros de entrada | Opção não numérica e salário em formato inválido não têm tratamento específico no menu ou no serviço; podem encerrar a execução com exceção. |
 | Repetição | Não existe laço de repetição nem pergunta para realizar outra operação. |
 
-As colunas com limite de tamanho são restringidas pelo banco, sem uma mensagem de validação própria da aplicação. A opção numérica `2` e outras opções diferentes de `1` seguem o caso padrão do menu.
+As colunas com limite de tamanho são restringidas pelo banco, sem uma mensagem de validação própria da aplicação. As opções numéricas diferentes de `1` e `2` seguem o caso padrão do menu e exibem `OPÇÃO INVÁLIDA!`.
 
 ## Banco de dados
 
@@ -141,17 +171,17 @@ As colunas com limite de tamanho são restringidas pelo banco, sem uma mensagem 
 | --- | --- |
 | Nome do banco | `bd-funcionarios` |
 | Usuário PostgreSQL | `coti` |
-| Senha PostgreSQL | `coti` |
+| Senha PostgreSQL | Valor de `POSTGRES_PASSWORD` no Compose, correspondente à configuração de `ConnectionFactory.java`. |
 | Host/porta para Java ou ferramentas na máquina local | `localhost:5434` |
 | URL JDBC | `jdbc:postgresql://localhost:5434/bd-funcionarios` |
 | Host/porta para o pgAdmin dentro do Compose | `postgres:5432` |
 | Endereço web do pgAdmin | [http://localhost:5051](http://localhost:5051) |
 | E-mail de acesso ao pgAdmin | `coti@email.com` |
-| Senha de acesso ao pgAdmin | `Coti@2026` |
+| Senha de acesso ao pgAdmin | Valor de `PGADMIN_DEFAULT_PASSWORD` no Compose. |
 
 O login do pgAdmin é diferente do login do PostgreSQL. Primeiro, entre na interface web com o e-mail e a senha do pgAdmin; depois, registre o servidor usando o usuário e a senha do banco.
 
-As credenciais estão no Compose e, no caso da aplicação, diretamente em `FuncionarioRepository.java`. São configurações de desenvolvimento local e devem ser adaptadas para outros ambientes.
+Os valores de acesso são definidos no Compose e, no caso da aplicação, diretamente em `ConnectionFactory.java`. Consulte esses arquivos no ambiente local para preencher as senhas. São configurações de desenvolvimento e devem ser adaptadas para outros ambientes.
 
 ### Estrutura da tabela funcionarios
 
@@ -204,7 +234,7 @@ docker version
 docker compose version
 ```
 
-Verifique se o Maven também está usando o JDK 21. A primeira execução precisa baixar a dependência JDBC e as imagens dos serviços.
+Verifique se o Maven também está usando o JDK 21. A primeira execução precisa baixar o driver JDBC, o Lombok e as imagens dos serviços.
 
 ### 2. Clonar o repositório
 
@@ -234,7 +264,7 @@ Esse comando verifica a disponibilidade do servidor; não confirma que a tabela 
 ### 4. Conectar o pgAdmin ao banco
 
 1. Abra [http://localhost:5051](http://localhost:5051).
-2. Entre com `coti@email.com` e senha `Coti@2026`.
+2. Entre com `coti@email.com` e a senha definida em `PGADMIN_DEFAULT_PASSWORD` no Compose.
 3. Em **Register > Server**, informe um nome para identificar a conexão, por exemplo `PostgreSQL app-funcionarios`.
 4. Na aba **Connection**, use:
 
@@ -244,7 +274,7 @@ Esse comando verifica a disponibilidade do servidor; não confirma que a tabela 
 | Port | `5432` |
 | Maintenance database | `bd-funcionarios` |
 | Username | `coti` |
-| Password | `coti` |
+| Password | Valor de `POSTGRES_PASSWORD` no Compose. |
 
 O pgAdmin está em um container e acessa o serviço pelo nome `postgres`. Para uma ferramenta instalada diretamente na máquina, use `localhost` e porta `5434`.
 
@@ -270,7 +300,7 @@ Os comandos iniciados por barra invertida são próprios do terminal `psql`, nã
 
 ### 6. Executar a aplicação Java
 
-**Pela IDE:** abra o projeto como Maven, configure o JDK 21, aguarde o carregamento do driver e execute a classe `cotiinformatica.Main`.
+**Pela IDE:** abra o projeto como Maven, configure o JDK 21, aguarde o carregamento das dependências e confira o suporte ao processamento de anotações do Lombok. Execute a classe `cotiinformatica.Main`.
 
 **Pelo terminal com Maven:**
 
@@ -279,7 +309,7 @@ mvn clean compile
 mvn org.codehaus.mojo:exec-maven-plugin:3.5.0:java -Dexec.mainClass=cotiinformatica.Main
 ```
 
-O segundo comando invoca explicitamente o Exec Maven Plugin e inclui as dependências na execução, sem exigir alteração no `pom.xml`. Use um terminal interativo para responder aos campos do cadastro.
+O segundo comando invoca explicitamente o Exec Maven Plugin e inclui as dependências na execução, sem exigir alteração no `pom.xml`. Use um terminal interativo para escolher a operação e responder aos campos do cadastro.
 
 O Compose inicia somente a infraestrutura de banco e administração. A aplicação Java é iniciada separadamente na máquina local.
 
@@ -314,7 +344,15 @@ Com banco acessível e tabela criada, a mensagem esperada é:
 FUNCIONÁRIO CADASTRADO COM SUCESSO!
 ```
 
-Como a consulta pelo menu ainda não está implementada, confira os registros no Query Tool ou no `psql`:
+Inicie o programa novamente e escolha `2`. O terminal deve listar ID, nome, CPF, matrícula, salário e cargo. O salário utiliza a representação padrão de `double`, sem formatação monetária brasileira.
+
+Se a lista retornada estiver vazia, o serviço apresenta:
+
+```text
+NENHUM FUNCIONÁRIO ENCONTRADO.
+```
+
+Para uma conferência adicional, inclusive da data de cadastro, execute no Query Tool ou no `psql`:
 
 ```sql
 SELECT id, nome, cpf, matricula, salario, cargo, datahoracadastro
@@ -322,7 +360,7 @@ FROM funcionarios
 ORDER BY datahoracadastro DESC, id;
 ```
 
-Essa consulta é uma instrução manual de conferência; não é executada pelo código Java. Cada novo cadastro gera outro UUID. Repetir CPF ou matrícula não é impedido pelo esquema atual.
+A consulta SQL acima é uma instrução manual de conferência e inclui `datahoracadastro`. O `SELECT` executado pelo Java utiliza a mesma ordenação, mas retorna apenas os seis campos exibidos no terminal. Cada novo cadastro gera outro UUID. Repetir CPF ou matrícula não é impedido pelo esquema atual.
 
 ## Ambiente Docker
 
@@ -365,17 +403,19 @@ Alterações em `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD` não recria
 | --- | --- |
 | Conexão recusada em `localhost:5434` | Confira os containers e logs, aguarde o banco iniciar e execute `pg_isready`. |
 | pgAdmin não se conecta ao servidor | Na conexão cadastrada dentro do pgAdmin, utilize `postgres:5432`; `localhost` apontaria para o próprio container do pgAdmin. |
-| Login do pgAdmin falha | Use o e-mail `coti@email.com` e senha `Coti@2026`; são diferentes das credenciais PostgreSQL. |
-| Erro de autenticação PostgreSQL | Confira `coti/coti` e se o volume foi inicializado anteriormente com outras credenciais. |
+| Login do pgAdmin falha | Use o e-mail configurado para o pgAdmin e a senha de `PGADMIN_DEFAULT_PASSWORD`; esse login é diferente do acesso ao PostgreSQL. |
+| Erro de autenticação PostgreSQL | Confira `POSTGRES_USER`, `POSTGRES_PASSWORD`, a configuração de `ConnectionFactory.java` e se o volume foi inicializado anteriormente com outras credenciais. |
 | Banco `bd-funcionarios` inexistente | Verifique a instância acessada e a inicialização do volume; as variáveis do Compose não alteram automaticamente um banco existente. |
 | `relation "funcionarios" does not exist` | Execute `schema.sql` no banco `bd-funcionarios` e confira a tabela. |
 | Tabela já existe ao criar | Confira a estrutura; o script não é idempotente. Não é necessário recriá-la a cada execução da aplicação. |
 | `NumberFormatException` no salário | Informe um número como `3500.00`, sem vírgula, separador de milhar ou `R$`. |
-| `NumberFormatException` no menu | Digite `1` para cadastrar; a entrada deve ser numérica. |
-| Opção `2` exibe opção inválida | Comportamento atual: existe no texto do menu, mas não no `switch`. Consulte diretamente no banco. |
+| `NumberFormatException` no menu | Digite `1` para cadastrar ou `2` para consultar; a entrada deve ser numérica. |
+| A consulta informa que não há funcionários | Confira se a tabela está vazia e se houve `FALHA AO CONSULTAR FUNCIONÁRIOS:` antes da mensagem. Uma falha também pode produzir lista vazia. |
+| A consulta retorna apenas parte dos registros | Verifique a mensagem de erro: uma falha durante a leitura retorna a lista construída até aquele momento. |
+| Getters e setters não encontrados | Verifique a resolução do Lombok e o processamento de anotações na IDE/compilação. |
 | Texto maior que o tamanho da coluna | Respeite os limites do esquema; o Java ainda não valida os comprimentos. |
 | `numeric field overflow` | Confira se o salário cabe na precisão `NUMERIC(10,2)`. |
-| Porta ocupada | Libere `5434` ou `5051`. Ao alterar a porta publicada do PostgreSQL, ajuste a URL JDBC no repositório. |
+| Porta ocupada | Libere `5434` ou `5051`. Ao alterar a porta publicada do PostgreSQL, ajuste a URL JDBC em `ConnectionFactory.java`. |
 | `invalid target release: 21` | Configure o JDK 21 na IDE e no Maven. |
 | Maven não resolve o driver | Verifique acesso ao repositório de dependências e disponibilidade da versão `42.7.13` declarada no `pom.xml`. |
 | `No suitable driver` | Execute com o driver PostgreSQL no classpath, pela IDE com Maven ou pelo comando indicado. |
@@ -384,20 +424,21 @@ Alterações em `POSTGRES_DB`, `POSTGRES_USER` e `POSTGRES_PASSWORD` não recria
 
 As funcionalidades abaixo ainda não estão implementadas e podem orientar a continuidade do projeto:
 
-- Implementar a consulta pelo menu e completar o CRUD com atualização e exclusão.
+- Completar o CRUD com atualização e exclusão e adicionar busca por ID ou filtros.
 - Adicionar um laço de navegação para realizar várias operações na mesma execução.
 - Validar campos em branco, limites de tamanho, CPF e entrada numérica.
 - Definir regras de negócio para salário e unicidade de CPF e matrícula, refletindo-as também no banco.
 - Usar `BigDecimal` para o salário e representar a data de cadastro no modelo Java.
 - Separar a interação com o console das regras de negócio e das mensagens de persistência.
-- Centralizar a configuração da conexão e externalizar credenciais.
-- Utilizar `try-with-resources` para fechar conexão e statement mesmo quando ocorrer uma exceção.
-- Retornar um resultado de persistência ao serviço, em vez de concentrar mensagens no repositório.
+- Externalizar as credenciais e demais configurações atualmente centralizadas em `ConnectionFactory`.
+- Estender o uso explícito de `try-with-resources` aos statements e resultados e remover o fechamento redundante da conexão na inserção.
+- Diferenciar falha de consulta de ausência de registros e evitar tratar listas parciais como consultas concluídas.
+- Retornar resultados ou propagar falhas ao serviço, em vez de concentrar mensagens no repositório.
 - Automatizar a criação e evolução do esquema e configurar health checks no Compose.
 - Fixar uma versão do pgAdmin e configurar os plugins Maven para facilitar a reprodução do ambiente.
 - Adicionar testes automatizados e integração contínua.
 
-O repositório ainda não contém testes automatizados. O exemplo de cadastro e a consulta SQL desta documentação fornecem um roteiro de verificação manual.
+O repositório ainda não contém testes automatizados. O exemplo de cadastro, a opção de consulta do menu e a conferência SQL desta documentação fornecem um roteiro de verificação manual.
 
 ## Imagem do projeto
 
@@ -412,7 +453,8 @@ As funcionalidades, restrições e configurações descritas têm como fonte os 
 - [Main.java — menu e opções implementadas](src/main/java/cotiinformatica/Main.java)
 - [Pessoa.java e seus atributos](src/main/java/cotiinformatica/entities/Pessoa.java)
 - [Funcionario.java — herança e dados do funcionário](src/main/java/cotiinformatica/entities/Funcionario.java)
-- [FuncionarioService.java — leitura dos dados e geração de UUID](src/main/java/cotiinformatica/services/FuncionarioService.java)
+- [FuncionarioService.java — cadastro e apresentação da consulta](src/main/java/cotiinformatica/services/FuncionarioService.java)
+- [ConnectionFactory.java — configuração e abertura das conexões JDBC](src/main/java/cotiinformatica/factories/ConnectionFactory.java)
 - [FuncionarioRepository.java — JDBC, SQL e tratamento de falhas](src/main/java/cotiinformatica/repositories/FuncionarioRepository.java)
 - [schema.sql — tipos e restrições da tabela](src/main/java/cotiinformatica/scripts/schema.sql)
 - [pom.xml — Java e dependências](pom.xml)
@@ -422,6 +464,7 @@ Documentação oficial para aprofundamento:
 
 - [Java 21 — API JDBC](https://docs.oracle.com/en/java/javase/21/docs/api/java.sql/java/sql/package-summary.html)
 - [Java 21 — UUID](https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/UUID.html)
+- [Lombok — @Data](https://projectlombok.org/features/Data)
 - [Apache Maven — Introdução](https://maven.apache.org/guides/getting-started/)
 - [MojoHaus — Exec Maven Plugin](https://www.mojohaus.org/exec-maven-plugin/)
 - [PostgreSQL JDBC Driver](https://jdbc.postgresql.org/documentation/)
