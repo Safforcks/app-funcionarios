@@ -22,6 +22,9 @@ public class Main {
             case 1:
                 funcionarioService.cadastrarFuncionario();
                 break;
+            case 2:
+                funcionarioService.consultarFuncionario();
+                break;
             default:
                 System.out.println("\nOPÇÃO INVÁLIDA!");
                 break;
