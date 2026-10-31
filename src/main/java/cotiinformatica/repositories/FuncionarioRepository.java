@@ -1,24 +1,15 @@
 package cotiinformatica.repositories;
 
 import cotiinformatica.entities.Funcionario;
-
-import java.sql.DriverManager;
+import cotiinformatica.factories.ConnectionFactory;
 
 public class FuncionarioRepository {
 
-    private String host = "jdbc:postgresql://localhost:5434/bd-funcionarios";
-    private String user = "coti";
-    private String pass = "coti";
-
-   /*
-   Método para receber um funcionário e salvá-lo
-   na tabela do banco de dados (INSERT)
-    */
-
     public void inserir(Funcionario funcionario) {
-        try {
-            //Abrindo conexão com o banco de dados
-            var connection = DriverManager.getConnection(host, user, pass);
+
+        var factory = new ConnectionFactory();
+
+        try (var connection = factory.createConnection()){
 
             //Escrevendo o comando SQL que iremos executar no banco de dados
             var statement = connection.prepareStatement("insert into funcionarios(id, nome, cpf, matricula, salario, cargo) values (?,?,?,?,?,?)");
